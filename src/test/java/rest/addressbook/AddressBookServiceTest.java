@@ -39,14 +39,26 @@ public class AddressBookServiceTest {
 		Client client = ClientBuilder.newClient();
 		Response response = client.target("http://localhost:8282/contacts")
 				.request().get();
-		assertEquals(200, response.getStatus());
-		assertEquals(0, response.readEntity(AddressBook.class).getPersonList()
-				.size());
+
+		int firstStatus = response.getStatus();
+		int firstSize = response.readEntity(AddressBook.class).getPersonList().size();
+		assertEquals(200, firstStatus);
+		assertEquals(0, firstSize);
 
 		//////////////////////////////////////////////////////////////////////
 		// Verify that GET /contacts is well implemented by the service, i.e
 		// test that it is safe and idempotent
-		//////////////////////////////////////////////////////////////////////	
+		//////////////////////////////////////////////////////////////////////
+
+		// Second request
+		Response response2 = client.target("http://localhost:8282/contacts")
+				.request().get();
+
+		// Test if the response Status is the same
+		assertEquals(firstStatus,response2.getStatus());
+		// Test if the list size is the same for the two request
+		assertEquals(firstSize,
+				response2.readEntity(AddressBook.class).getPersonList().size());
 	}
 
 	@Test
@@ -66,6 +78,8 @@ public class AddressBookServiceTest {
 				.request(MediaType.APPLICATION_JSON)
 				.post(Entity.entity(juan, MediaType.APPLICATION_JSON));
 
+
+
 		assertEquals(201, response.getStatus());
 		assertEquals(juanURI, response.getLocation());
 		assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
@@ -74,9 +88,17 @@ public class AddressBookServiceTest {
 		assertEquals(1, juanUpdated.getId());
 		assertEquals(juanURI, juanUpdated.getHref());
 
+		// Store the size of the server's list
+		response = client.target("http://localhost:8282/contacts")
+				.request(MediaType.APPLICATION_JSON).get();
+		int size = response.readEntity(AddressBook.class).getPersonList().size();
+
+
 		// Check that the new user exists
 		response = client.target("http://localhost:8282/contacts/person/1")
 				.request(MediaType.APPLICATION_JSON).get();
+
+
 		assertEquals(200, response.getStatus());
 		assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
 		juanUpdated = response.readEntity(Person.class);
@@ -84,10 +106,28 @@ public class AddressBookServiceTest {
 		assertEquals(1, juanUpdated.getId());
 		assertEquals(juanURI, juanUpdated.getHref());
 
+
 		//////////////////////////////////////////////////////////////////////
 		// Verify that POST /contacts is well implemented by the service, i.e
 		// test that it is not safe and not idempotent
-		//////////////////////////////////////////////////////////////////////	
+		//////////////////////////////////////////////////////////////////////
+
+		// Create a new user
+		response = client.target("http://localhost:8282/contacts")
+				.request(MediaType.APPLICATION_JSON)
+				.post(Entity.entity(juan, MediaType.APPLICATION_JSON));
+
+		// Check the server state
+		response = client.target("http://localhost:8282/contacts")
+				.request(MediaType.APPLICATION_JSON).get();
+
+		// Check if the size of the server's list has changed from the first POST request
+		// to the second.
+		// If the size of the two lists are not equal, it means that the POST request is not
+		// idempotent because the result state of the two requests is different. If a request
+		// is not idempotent, it can't be safe, so we've proved that POST is not safe and not
+		// idempotent.
+		assertNotEquals(size, response.readEntity(AddressBook.class).getPersonList().size());
 				
 	}
 
