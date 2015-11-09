@@ -371,12 +371,19 @@ public class AddressBookServiceTest {
 		ab.getPersonList().add(juan);
 		launchServer(ab);
 
+		int size = ab.getPersonList().size();
 		// Delete a user
 		Client client = ClientBuilder.newClient();
 		Response response = client
 				.target("http://localhost:8282/contacts/person/2").request()
 				.delete();
 		assertEquals(204, response.getStatus());
+
+		// Check the server state
+		response = client.target("http://localhost:8282/contacts")
+				.request(MediaType.APPLICATION_JSON).get();
+		int size2 = response.readEntity(AddressBook.class).getPersonList().size();
+		assertNotEquals(size,size2);
 
 		// Verify that the user has been deleted
 		response = client.target("http://localhost:8282/contacts/person/2")
@@ -387,6 +394,11 @@ public class AddressBookServiceTest {
 		// Verify that DELETE /contacts/person/2 is well implemented by the service, i.e
 		// test that it is idempotent
 		//////////////////////////////////////////////////////////////////////	
+		response = client.target("http://localhost:8282/contacts")
+				.request(MediaType.APPLICATION_JSON).get();
+
+		assertEquals(size2,
+				response.readEntity(AddressBook.class).getPersonList().size());
 
 	}
 
